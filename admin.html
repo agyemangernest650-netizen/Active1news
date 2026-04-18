@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin — Active1 News</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp, getDocs, getDoc,
+           deleteDoc, doc, updateDoc }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ① PASTE YOUR FIREBASE CONFIG HERE
+  //    Firebase Console → Project Settings → Your Apps → SDK setup
+  // ═══════════════════════════════════════════════════════════════════════════
+   const firebaseConfig = {
+  apiKey: "AIzaSyDApdfrTSUndjEivoUqdLTp9-8MoPjFT7U",
+  authDomain: "my-news-database.firebaseapp.com",
+  projectId: "my-news-database",
+  storageBucket: "my-news-database.firebasestorage.app",
+  messagingSenderId: "378489670996",
+  appId: "1:378489670996:web:53f29f4d96777b62108cc1"
+};
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ② PASTE YOUR CLOUDINARY CREDENTIALS HERE
+  //    cloudinary.com → Dashboard → Cloud Name
+  //    Settings → Upload → Upload Presets → Add (set to Unsigned)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const CLOUDINARY_CLOUD  = "dulnujvm7";
+  const CLOUDINARY_PRESET = "ernest";
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ③ LIST YOUR ADMIN EMAILS HERE
+  //    Only these emails can access the dashboard after login
+  // ═══════════════════════════════════════════════════════════════════════════
+  const ADMIN_EMAILS = [
+    "activemediaempire@gmail.com",
+    "agyemangernest650@gmail.com"
+    // add more admin emails here if needed
+  ];
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const app  = initializeApp(firebaseConfig);
+  const db   = getFirestore(app);
+  const auth = getAuth(app);
+
+  // ── AUTH — only allow listed admin emails ─────────────────────────────────
+  onAuthStateChanged(auth, user => {
+    if (user && ADMIN_EMAILS.includes(user.email)) {
+      // ✅ valid admin
+      document.getElementById("login-screen").style.display  = "none";
+      document.getElementById("access-denied").style.display = "none";
+      document.getElementById("dashboard").style.display     = "flex";
+      document.getElementById("admin-email").textContent     = user.email;
+      loadPosts();
+      loadMessages();
+    } else if (user && !ADMIN_EMAILS.includes(user.email)) {
+      // ⛔ logged in but not an admin
+      signOut(auth);
+      document.getElementById("login-screen").style.display  = "none";
+      document.getElementById("dashboard").style.display     = "none";
+      document.getElementById("access-denied").style.display = "flex";
+    } else {
+      // not logged in
+      document.getElementById("login-screen").style.display  = "flex";
+      document.getElementById("dashboard").style.display     = "none";
+      document.getElementById("access-denied").style.display = "none";
+    }
+  });
+
+  window.handleLogin = async () => {
+    const email = document.getElementById("login-email").value.trim();
+    const pass  = document.getElementById("login-pass").value;
+    const btn   = document.getElementById("login-btn");
+    const err   = document.getElementById("login-error");
+
+    // pre-check before even trying Firebase
+    if (!ADMIN_EMAILS.includes(email)) {
+      err.textContent = "Access denied. This account is not an admin.";
+      return;
+    }
+
+    err.textContent = ""; btn.textContent = "SIGNING IN…"; btn.disabled = true;
+    try { await signInWithEmailAndPassword(auth, email, pass); }
+    catch(e) {
+      err.textContent = e.code === "auth/wrong-password" || e.code === "auth/user-not-found"
+        ? "Wrong email or password." : "Login failed: " + e.message;
+      btn.textContent = "SIGN IN"; btn.disabled = false;
+    }
+  };
+
+  window.handleLogout = async () => {
+    await signOut(auth);
+    document.getElementById("login-email").value = "";
+    document.getElementById("login-pass").value  = "";
+  };
+
+  // ── CLOUDINARY UPLOAD ────────────────────────────────────────────────────
+  function uploadToCloudinary(file, barId, statusId) {
+    return new Promise((resolve, reject) => {
+      const type = file.type.startsWith("video") || file.type.startsWith("audio") ? "video" : "image";
+      const fd   = new FormData();
+      fd.append("file", file);
+      fd.append("upload_preset", CLOUDINARY_PRESET);
+
+      const xhr  = new XMLHttpRequest();
+      const bar  = document.getElementById(barId);
+      const fill = bar?.querySelector(".prog-fill");
+      const lbl  = bar?.querySelector(".prog-lbl");
+      const stat = document.getElementById(statusId);
+      if (bar) bar.style.display = "block";
+
+      xhr.upload.addEventListener("progress", e => {
+        if (!e.lengthComputable) return;
+        const p = Math.round(e.loaded / e.total * 100);
+        if (fill) fill.style.width = p + "%";
+        if (lbl)  lbl.textContent  = p + "%";
+        if (stat) stat.textContent = "Uploading " + p + "%";
+      });
+      xhr.addEventListener("load", () => {
+        if (xhr.status === 200) {
+          const res = JSON.parse(xhr.responseText);
+          if (stat) stat.textContent = "✓ Done";
+          resolve(res.secure_url);
+        } else reject(new Error("Cloudinary error: " + xhr.status));
+      });
+      xhr.addEventListener("error", () => reject(new Error("Network error")));
+      xhr.open("POST", `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${type}/upload`);
+      xhr.send(fd);
+    });
+  }
+
+  // ── PUBLISH POST ─────────────────────────────────────────────────────────
+  window.publishPost = async () => {
+    const title    = document.getElementById("post-title").value.trim();
+    const body     = document.getElementById("post-body").value.trim();
+    const author   = document.getElementById("post-author").value.trim() || "Admin";
+    const tag      = document.getElementById("post-tag").value.trim();
+    const status   = document.getElementById("post-status").value;
+    const featured = document.getElementById("post-featured").checked;
+    const cats     = [...document.querySelectorAll(".cat-cb:checked")].map(c => c.value);
+    const imgFile  = document.getElementById("post-image").files[0];
+    const vidFile  = document.getElementById("post-video").files[0];
+    const musFile  = document.getElementById("post-music").files[0];
+
+    if (!title || !body)  { showToast("Title and body are required.", "error"); return; }
+    if (!cats.length)     { showToast("Select at least one category.", "error"); return; }
+    if (CLOUDINARY_CLOUD === "YOUR_CLOUD_NAME") { showToast("Set your Cloudinary credentials first.", "error"); return; }
+
+    const btn = document.getElementById("publish-btn");
+    btn.disabled = true; btn.textContent = "UPLOADING…";
+
+    try {
+      let imageURL = "", videoURL = "", musicURL = "";
+      const jobs = [];
+      if (imgFile) jobs.push(uploadToCloudinary(imgFile, "img-bar", "img-status").then(u => imageURL = u));
+      if (vidFile) jobs.push(uploadToCloudinary(vidFile, "vid-bar", "vid-status").then(u => videoURL = u));
+      if (musFile) jobs.push(uploadToCloudinary(musFile, "mus-bar", "mus-status").then(u => musicURL = u));
+      if (jobs.length) await Promise.all(jobs);
+
+      const mediaType = videoURL ? "video" : musicURL ? "audio" : imageURL ? "image" : "text";
+      btn.textContent = "SAVING…";
+
+      await addDoc(collection(db, "posts"), {
+        title, body, author, tag, status, featured,
+        categories: cats, imageURL, videoURL, musicURL, mediaType,
+        createdAt: serverTimestamp(), views: 0, commentCount: 0
+      });
+
+      showToast("Post published successfully!", "success");
+      clearForm();
+      loadPosts();
+    } catch(e) {
+      showToast("Error: " + e.message, "error");
+    } finally {
+      btn.textContent = "PUBLISH POST"; btn.disabled = false;
+    }
+  };
+
+  // ── POSTS ────────────────────────────────────────────────────────────────
+  window.loadPosts = async (filterCat = "all") => {
+    const el = document.getElementById("posts-list");
+    el.innerHTML = '<div class="list-msg">Loading…</div>';
+    try {
+      const snap = await getDocs(collection(db, "posts"));
+      let posts = [];
+      snap.forEach(d => posts.push({ id: d.id, ...d.data() }));
+      if (filterCat !== "all") posts = posts.filter(p => p.categories?.includes(filterCat));
+      posts.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+      if (!posts.length) { el.innerHTML = '<div class="list-msg">No posts found.</div>'; return; }
+
+      el.innerHTML = posts.map(p => {
+        const icons = [p.imageURL?"🖼":"", p.videoURL?"🎬":"", p.musicURL?"🎵":""].filter(Boolean).join(" ") || "📝";
+        const thumb = p.imageURL
+          ? `<img src="${p.imageURL}" alt="">`
+          : p.videoURL ? `<div class="thumb-ph" style="color:#5caaff">▶ VIDEO</div>`
+          : p.musicURL ? `<div class="thumb-ph" style="color:#c05cff">♪ AUDIO</div>`
+          : `<div class="thumb-ph">TEXT</div>`;
+        return `
+        <div class="post-row" id="row-${p.id}">
+          <div class="post-thumb">${thumb}</div>
+          <div class="post-info">
+            <div class="post-title-row">${icons} ${p.title}</div>
+            <div class="post-pills">
+              <span class="pill status-${p.status||'published'}">${p.status||"published"}</span>
+              ${(p.categories||[]).map(c=>`<span class="pill pill-cat">${c}</span>`).join("")}
+              ${p.featured?`<span class="pill pill-feat">★ Featured</span>`:""}
+            </div>
+            <div class="post-byline">By ${p.author||"Admin"} ${p.tag?"· "+p.tag:""}
+              <span class="stats-txt">👁 ${p.views||0} · 💬 ${p.commentCount||0}</span>
+            </div>
+          </div>
+          <button class="del-btn" onclick="deletePost('${p.id}')">DELETE</button>
+        </div>`;
+      }).join("");
+    } catch(e) {
+      el.innerHTML = `<div class="list-msg err">Error: ${e.message}</div>`;
+    }
+  };
+
+  window.deletePost = async id => {
+    if (!confirm("Delete this post permanently?")) return;
+    try { await deleteDoc(doc(db,"posts",id)); document.getElementById("row-"+id)?.remove(); showToast("Post deleted.","success"); }
+    catch(e) { showToast("Error: "+e.message,"error"); }
+  };
+
+  // ── MESSAGES ─────────────────────────────────────────────────────────────
+  window.loadMessages = async () => {
+    const el = document.getElementById("messages-list");
+    if (!el) return;
+    el.innerHTML = '<div class="list-msg">Loading messages…</div>';
+    try {
+      const snap = await getDocs(collection(db, "messages"));
+      let msgs = [];
+      snap.forEach(d => msgs.push({ id: d.id, ...d.data() }));
+      msgs.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+      const unread = msgs.filter(m => !m.read).length;
+      const badge  = document.getElementById("msg-badge");
+      if (badge) badge.textContent = unread > 0 ? unread : "";
+
+      if (!msgs.length) { el.innerHTML = '<div class="list-msg">No messages yet.</div>'; return; }
+
+      el.innerHTML = msgs.map(m => `
+        <div class="msg-row ${m.read?"msg-read":"msg-unread"}" id="msgrow-${m.id}" onclick="openMessage('${m.id}')">
+          <div class="msg-dot ${m.read?"":"dot-on"}"></div>
+          <div class="msg-info">
+            <div class="msg-from">${m.name||"Anonymous"} <span class="msg-email-small">&lt;${m.email||"no email"}&gt;</span></div>
+            <div class="msg-subj">${m.subject||"(No subject)"}</div>
+            <div class="msg-meta-row">
+              <span class="msg-topic-tag">${m.topic||"General"}</span>
+              <span class="msg-time">${ago(m.createdAt?.seconds)}</span>
+            </div>
+          </div>
+          <button class="del-btn" onclick="event.stopPropagation();deleteMsg('${m.id}')">✕</button>
+        </div>`).join("");
+    } catch(e) {
+      el.innerHTML = `<div class="list-msg err">Error: ${e.message}</div>`;
+    }
+  };
+
+  window.openMessage = async (id) => {
+    const msgRef = doc(db, "messages", id);
+    const snap   = await getDoc(msgRef);
+    if (!snap.exists()) return;
+    const m = { id: snap.id, ...snap.data() };
+    if (!m.read) {
+      await updateDoc(msgRef, { read: true });
+      const row = document.getElementById("msgrow-"+id);
+      if (row) { row.classList.replace("msg-unread","msg-read"); row.querySelector(".msg-dot")?.classList.remove("dot-on"); }
+      const badge = document.getElementById("msg-badge");
+      if (badge) { const c=parseInt(badge.textContent)||0; badge.textContent=c>1?c-1:""; }
+    }
+    document.getElementById("msg-detail").innerHTML = `
+      <div class="detail-toolbar">
+        <span class="detail-back" onclick="clearDetail()">← Back</span>
+        <button class="del-btn" onclick="deleteMsg('${m.id}')">DELETE</button>
+      </div>
+      <div class="detail-from"><strong>${m.name||"Anonymous"}</strong> &lt;${m.email||"no email"}&gt;</div>
+      <div class="detail-subject">${m.subject||"(No subject)"}</div>
+      <div class="detail-meta">
+        <span class="msg-topic-tag">${m.topic||"General"}</span>
+        <span class="msg-time">${ago(m.createdAt?.seconds)}</span>
+      </div>
+      <div class="detail-body">${(m.message||"").replace(/\n/g,"<br>")}</div>
+      ${m.email?`<a class="reply-btn" href="mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject||"")}">✉ Reply via Email</a>`:""}`;
+  };
+
+  window.clearDetail = () => { document.getElementById("msg-detail").innerHTML='<div class="detail-empty">← Click a message to read it</div>'; };
+  window.deleteMsg = async id => {
+    if (!confirm("Delete this message?")) return;
+    try { await deleteDoc(doc(db,"messages",id)); document.getElementById("msgrow-"+id)?.remove(); clearDetail(); showToast("Deleted.","success"); }
+    catch(e) { showToast("Error: "+e.message,"error"); }
+  };
+
+  function ago(sec) {
+    if (!sec) return "";
+    const d = Math.floor(Date.now()/1000 - sec);
+    if (d < 60) return "Just now"; if (d < 3600) return Math.floor(d/60)+"m ago";
+    if (d < 86400) return Math.floor(d/3600)+"h ago"; return Math.floor(d/86400)+"d ago";
+  }
+
+  // ── HELPERS ──────────────────────────────────────────────────────────────
+  function clearForm() {
+    ["post-title","post-body","post-author","post-tag"].forEach(id => document.getElementById(id).value="");
+    ["post-image","post-video","post-music"].forEach(id => document.getElementById(id).value="");
+    ["img-preview","vid-preview","mus-preview"].forEach(id => document.getElementById(id).innerHTML="");
+    ["img-status","vid-status","mus-status"].forEach(id => { const e=document.getElementById(id); if(e) e.textContent="No file"; });
+    ["img-bar","vid-bar","mus-bar"].forEach(id => {
+      const e=document.getElementById(id); if(!e)return;
+      e.style.display="none"; e.querySelector(".prog-fill").style.width="0%"; e.querySelector(".prog-lbl").textContent="0%";
+    });
+    document.querySelectorAll(".cat-cb").forEach(c=>c.checked=false);
+    document.getElementById("post-featured").checked=false;
+    document.getElementById("post-status").value="published";
+  }
+
+  function showToast(msg, type) {
+    const t=document.getElementById("toast");
+    t.textContent=msg; t.className="toast show "+type;
+    setTimeout(()=>t.className="toast",3200);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("login-pass").addEventListener("keydown", e => { if(e.key==="Enter") handleLogin(); });
+    document.getElementById("post-image").addEventListener("change", function() {
+      const f=this.files[0]; if(!f)return;
+      document.getElementById("img-status").textContent=f.name+" ("+(f.size/1048576).toFixed(1)+" MB)";
+      const r=new FileReader(); r.onload=e=>{ document.getElementById("img-preview").innerHTML=`<img src="${e.target.result}">`; }; r.readAsDataURL(f);
+    });
+    document.getElementById("post-video").addEventListener("change", function() {
+      const f=this.files[0]; if(!f)return;
+      document.getElementById("vid-status").textContent=f.name+" ("+(f.size/1048576).toFixed(1)+" MB)";
+      document.getElementById("vid-preview").innerHTML=`<video src="${URL.createObjectURL(f)}" controls></video>`;
+    });
+    document.getElementById("post-music").addEventListener("change", function() {
+      const f=this.files[0]; if(!f)return;
+      document.getElementById("mus-status").textContent=f.name+" ("+(f.size/1048576).toFixed(1)+" MB)";
+      document.getElementById("mus-preview").innerHTML=`<audio src="${URL.createObjectURL(f)}" controls></audio>`;
+    });
+  });
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--surf:#111;--surf2:#1a1a1a;--bdr:#2a2a2a;
+  --acc:#e8ff3a;--red:#ff3a3a;--grn:#3aff8c;--txt:#f0f0f0;--mut:#666;
+  --fh:'Bebas Neue',sans-serif;--fm:'IBM Plex Mono',monospace;--fb:'IBM Plex Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--txt);font-family:var(--fb);min-height:100vh}
+
+/* ── LOGIN ── */
+#login-screen,#access-denied{
+  display:none;align-items:center;justify-content:center;min-height:100vh;
+  background-image:
+    repeating-linear-gradient(0deg,transparent,transparent 39px,var(--bdr) 39px,var(--bdr) 40px),
+    repeating-linear-gradient(90deg,transparent,transparent 39px,var(--bdr) 39px,var(--bdr) 40px);
+}
+.login-card{background:var(--surf);border:1px solid var(--bdr);padding:48px;width:400px;position:relative}
+.login-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--acc)}
+.login-logo{font-family:var(--fh);font-size:42px;letter-spacing:2px;color:var(--acc);margin-bottom:4px}
+.login-sub{font-family:var(--fm);font-size:11px;color:var(--mut);letter-spacing:3px;text-transform:uppercase;margin-bottom:40px}
+.lbl{display:block;font-family:var(--fm);font-size:10px;letter-spacing:2px;color:var(--mut);text-transform:uppercase;margin-bottom:8px}
+.inp{width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-family:var(--fm);font-size:14px;padding:12px 14px;outline:none;margin-bottom:20px;transition:border-color .2s}
+.inp:focus{border-color:var(--acc)}
+.login-btn{width:100%;background:var(--acc);color:#000;border:none;font-family:var(--fh);font-size:20px;letter-spacing:2px;padding:14px;cursor:pointer;margin-top:8px}
+.login-btn:hover{opacity:.85}.login-btn:disabled{opacity:.5}
+#login-error{font-family:var(--fm);font-size:11px;color:var(--red);min-height:16px;margin-top:12px}
+.denied-card{background:var(--surf);border:1px solid var(--red);padding:48px;width:400px;text-align:center}
+.denied-card::before{content:'⛔';font-size:48px;display:block;margin-bottom:16px}
+.denied-title{font-family:var(--fh);font-size:28px;color:var(--red);margin-bottom:8px}
+.denied-sub{font-family:var(--fm);font-size:11px;color:var(--mut);letter-spacing:1px;line-height:1.6}
+
+/* ── DASHBOARD ── */
+#dashboard{display:none;flex-direction:column;min-height:100vh}
+.hdr{background:var(--surf);border-bottom:1px solid var(--bdr);padding:0 32px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.hdr-logo{font-family:var(--fh);font-size:26px;letter-spacing:3px;color:var(--acc)}
+.hdr-r{display:flex;align-items:center;gap:20px}
+#admin-email{font-family:var(--fm);font-size:11px;color:var(--mut)}
+.logout-btn{background:none;border:1px solid var(--bdr);color:var(--mut);font-family:var(--fm);font-size:10px;letter-spacing:2px;padding:6px 14px;cursor:pointer}
+.logout-btn:hover{border-color:var(--red);color:var(--red)}
+.body-wrap{display:grid;grid-template-columns:370px 1fr;flex:1;min-height:calc(100vh - 58px)}
+
+/* ── SIDEBAR ── */
+.sidebar{background:var(--surf);border-right:1px solid var(--bdr);padding:26px 20px;overflow-y:auto;height:calc(100vh - 58px);position:sticky;top:58px}
+.sb-head{font-family:var(--fh);font-size:22px;letter-spacing:2px;color:var(--acc);margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid var(--bdr)}
+.fld{margin-bottom:16px}
+textarea.inp{resize:vertical;min-height:100px;margin-bottom:0}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath fill='%23666' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;margin-bottom:0}
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.cat-chk{display:flex;align-items:center;gap:8px;background:var(--surf2);border:1px solid var(--bdr);padding:8px 10px;cursor:pointer;transition:border-color .15s;user-select:none}
+.cat-chk:hover{border-color:var(--acc)}
+.cat-chk input{display:none}
+.chk-box{width:14px;height:14px;border:1px solid var(--mut);flex-shrink:0;position:relative}
+.cat-chk input:checked~.chk-box{background:var(--acc);border-color:var(--acc)}
+.cat-chk input:checked~.chk-box::after{content:'';position:absolute;top:1px;left:3px;width:6px;height:4px;border-left:2px solid #000;border-bottom:2px solid #000;transform:rotate(-45deg)}
+.cat-name{font-family:var(--fm);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+.tgl-row{display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer}
+.tgl-lbl{font-family:var(--fm);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mut)}
+#post-featured{display:none}
+.tgl-track{width:36px;height:20px;background:var(--bdr);border-radius:10px;position:relative;transition:background .2s;flex-shrink:0}
+.tgl-track::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;background:var(--txt);border-radius:50%;transition:left .2s}
+#post-featured:checked+.tgl-track{background:var(--acc)}
+#post-featured:checked+.tgl-track::after{left:19px}
+.media-head{font-family:var(--fm);font-size:10px;letter-spacing:2px;color:var(--mut);text-transform:uppercase;margin-bottom:10px}
+.media-note{font-family:var(--fm);font-size:10px;color:var(--acc);padding:8px 10px;background:rgba(232,255,58,.06);border:1px solid rgba(232,255,58,.2);margin-bottom:12px;letter-spacing:1px}
+.upload-slot{background:var(--surf2);border:1px solid var(--bdr);margin-bottom:10px;overflow:hidden}
+.slot-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bdr)}
+.slot-icon{font-size:16px}.slot-label{font-family:var(--fm);font-size:11px;letter-spacing:1px;text-transform:uppercase;flex:1}
+.slot-status{font-family:var(--fm);font-size:10px;color:var(--mut);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-area{border:1px dashed var(--bdr);margin:8px;padding:14px;text-align:center;position:relative;cursor:pointer;transition:border-color .2s}
+.upload-area:hover{border-color:var(--acc)}
+.upload-area input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-lbl{font-family:var(--fm);font-size:9px;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase;line-height:1.8;pointer-events:none}
+.prev-wrap{padding:0 8px 8px}
+.prev-wrap img{width:100%;height:90px;object-fit:cover;display:block}
+.prev-wrap video{width:100%;max-height:100px;background:#000;display:block}
+.prev-wrap audio{width:100%;display:block;margin-top:4px}
+.prog-bar{display:none;height:22px;background:var(--bdr);margin:0 8px 8px;position:relative;overflow:hidden}
+.prog-fill{height:100%;background:var(--acc);width:0%;transition:width .3s}
+.prog-lbl{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--fm);font-size:9px;color:#000;font-weight:600}
+#publish-btn{width:100%;background:var(--acc);color:#000;border:none;font-family:var(--fh);font-size:22px;letter-spacing:3px;padding:15px;cursor:pointer;margin-top:10px}
+#publish-btn:hover{opacity:.85}#publish-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── MAIN ── */
+.main{display:flex;flex-direction:column;overflow-y:auto}
+.main-tabs{display:flex;border-bottom:2px solid var(--bdr);background:var(--surf);position:sticky;top:58px;z-index:50}
+.main-tab{background:none;border:none;border-bottom:3px solid transparent;color:var(--mut);font-family:var(--fh);font-size:19px;letter-spacing:1px;padding:14px 28px;cursor:pointer;transition:all .15s;margin-bottom:-2px;display:flex;align-items:center;gap:8px}
+.main-tab:hover{color:var(--txt)}.main-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.msg-badge{background:var(--red);color:#fff;font-family:var(--fm);font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center;display:none}
+.msg-badge:not(:empty){display:inline-block}
+.panel{display:none;padding:24px 28px;flex:1}
+.panel.active{display:block}
+.panel-head{font-family:var(--fh);font-size:24px;letter-spacing:2px;margin-bottom:18px}
+.filter-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:20px}
+.f-tab{background:none;border:1px solid var(--bdr);color:var(--mut);font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:5px 13px;cursor:pointer}
+.f-tab:hover,.f-tab.active{border-color:var(--acc);color:var(--acc)}
+.post-row{display:flex;gap:12px;align-items:center;background:var(--surf);border:1px solid var(--bdr);padding:12px 14px;margin-bottom:8px}
+.post-row:hover{border-color:#3a3a3a}
+.post-thumb{width:68px;height:50px;flex-shrink:0;overflow:hidden;background:var(--surf2)}
+.post-thumb img{width:100%;height:100%;object-fit:cover}
+.thumb-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:8px;color:var(--mut);text-align:center}
+.post-info{flex:1;min-width:0}
+.post-title-row{font-size:13px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.post-pills{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:3px}
+.pill{font-family:var(--fm);font-size:9px;padding:2px 7px;text-transform:uppercase;letter-spacing:.5px}
+.status-published{background:#1a3a1a;color:#5cff5c}.status-draft{background:#3a3a1a;color:#ffdd5c}.status-scheduled{background:#1a2a3a;color:#5caaff}
+.pill-cat{background:var(--surf2);border:1px solid var(--bdr);color:var(--mut)}
+.pill-feat{background:#2a2a00;border:1px solid #555500;color:var(--acc)}
+.post-byline{font-family:var(--fm);font-size:10px;color:var(--mut);display:flex;align-items:center;gap:6px}
+.stats-txt{margin-left:auto;opacity:.6}
+.del-btn{background:none;border:1px solid var(--bdr);color:var(--mut);font-family:var(--fm);font-size:9px;letter-spacing:1.5px;padding:5px 10px;cursor:pointer;flex-shrink:0;white-space:nowrap}
+.del-btn:hover{border-color:var(--red);color:var(--red)}
+.list-msg{font-family:var(--fm);font-size:12px;color:var(--mut);padding:32px;text-align:center;border:1px dashed var(--bdr)}
+.list-msg.err{color:var(--red)}
+
+/* ── MESSAGES ── */
+.msgs-layout{display:grid;grid-template-columns:300px 1fr;border:1px solid var(--bdr);min-height:480px}
+.msgs-inbox{border-right:1px solid var(--bdr);overflow-y:auto;max-height:calc(100vh - 220px)}
+.msgs-detail{overflow-y:auto;max-height:calc(100vh - 220px)}
+.msg-row{display:flex;align-items:flex-start;gap:10px;padding:13px 14px;border-bottom:1px solid var(--bdr);cursor:pointer;transition:background .15s}
+.msg-row:hover{background:rgba(255,255,255,.04)}.msg-unread{background:rgba(232,255,58,.04)}.msg-read{opacity:.65}
+.msg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;background:transparent}
+.dot-on{background:var(--acc)}
+.msg-info{flex:1;min-width:0}
+.msg-from{font-family:var(--fm);font-size:11px;font-weight:600;color:var(--txt);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg-email-small{font-weight:400;color:var(--mut);font-size:10px}
+.msg-subj{font-size:12px;color:var(--txt);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg-meta-row{display:flex;align-items:center;gap:8px}
+.msg-topic-tag{font-family:var(--fm);font-size:9px;background:var(--surf2);border:1px solid var(--bdr);padding:1px 6px;text-transform:uppercase;color:var(--mut);letter-spacing:1px}
+.msg-time{font-family:var(--fm);font-size:9px;color:var(--mut)}
+.detail-empty{font-family:var(--fm);font-size:12px;color:var(--mut);padding:48px;text-align:center;letter-spacing:1px}
+.detail-toolbar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--bdr)}
+.detail-back{font-family:var(--fm);font-size:10px;letter-spacing:2px;color:var(--mut);cursor:pointer;text-transform:uppercase;padding:5px 10px;border:1px solid var(--bdr)}
+.detail-back:hover{border-color:var(--acc);color:var(--acc)}
+.detail-from{font-family:var(--fm);font-size:11px;color:var(--txt);padding:16px 18px 4px}
+.detail-subject{font-family:var(--fh);font-size:22px;letter-spacing:1px;padding:4px 18px 6px;color:var(--txt)}
+.detail-meta{padding:0 18px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px}
+.detail-body{padding:20px 18px;font-size:14px;color:var(--txt);line-height:1.75;white-space:pre-wrap}
+.reply-btn{display:inline-block;margin:4px 18px 24px;background:var(--acc);color:#000;font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:10px 20px;text-decoration:none}
+.reply-btn:hover{opacity:.8}
+
+/* toast */
+.toast{position:fixed;bottom:28px;right:28px;background:var(--surf2);border:1px solid var(--bdr);border-left:3px solid var(--acc);color:var(--txt);font-family:var(--fm);font-size:12px;padding:14px 20px;max-width:320px;transform:translateY(80px);opacity:0;transition:all .3s;z-index:999;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}.toast.error{border-left-color:var(--red)}.toast.success{border-left-color:var(--grn)}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- ══ ACCESS DENIED ══ -->
+<div id="access-denied">
+  <div class="denied-card">
+    <div class="denied-title">Access Denied</div>
+    <div class="denied-sub">This account is not authorised to access the admin panel.<br><br>
+      <a href="index.html" style="color:var(--acc);font-family:var(--fm);font-size:11px;letter-spacing:2px">← Return to Homepage</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LOGIN ══ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">ADMIN</div>
+    <div class="login-sub">Content Management System</div>
+    <label class="lbl">Email Address</label>
+    <input class="inp" id="login-email" type="email" placeholder="admin@yoursite.com">
+    <label class="lbl">Password</label>
+    <input class="inp" id="login-pass" type="password" placeholder="••••••••••">
+    <button class="login-btn" id="login-btn" onclick="handleLogin()">SIGN IN</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div id="dashboard">
+  <header class="hdr">
+    <div class="hdr-logo">Active1 News ADMIN</div>
+    <div class="hdr-r">
+      <span id="admin-email"></span>
+      <button class="logout-btn" onclick="handleLogout()">SIGN OUT</button>
+    </div>
+  </header>
+
+  <div class="body-wrap">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sb-head">NEW POST</div>
+      <div class="fld"><label class="lbl">Headline *</label><input class="inp" id="post-title" type="text" placeholder="Enter headline…"></div>
+      <div class="fld"><label class="lbl">Body / Content *</label><textarea class="inp" id="post-body" placeholder="Write your content here…"></textarea></div>
+      <div class="fld"><label class="lbl">Author</label><input class="inp" id="post-author" type="text" placeholder="Author name"></div>
+      <div class="fld"><label class="lbl">Tag / Label</label><input class="inp" id="post-tag" type="text" placeholder="e.g. Breaking, Exclusive…"></div>
+      <div class="fld"><label class="lbl">Status</label>
+        <select class="inp" id="post-status">
+          <option value="published">Published</option>
+          <option value="draft">Draft</option>
+          <option value="scheduled">Scheduled</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label class="lbl">Publish To *</label>
+        <div class="cat-grid">
+          <label class="cat-chk"><input type="checkbox" class="cat-cb" value="home"><div class="chk-box"></div><span class="cat-name">Home</span></label>
+          <label class="cat-chk"><input type="checkbox" class="cat-cb" value="news"><div class="chk-box"></div><span class="cat-name">News</span></label>
+          <label class="cat-chk"><input type="checkbox" class="cat-cb" value="music"><div class="chk-box"></div><span class="cat-name">Music</span></label>
+          <label class="cat-chk"><input type="checkbox" class="cat-cb" value="entertainment"><div class="chk-box"></div><span class="cat-name">Entertain.</span></label>
+          <label class="cat-chk"><input type="checkbox" class="cat-cb" value="sports"><div class="chk-box"></div><span class="cat-name">Sports</span></label>
+          <label class="cat-chk"><input type="checkbox" class="cat-cb" value="business"><div class="chk-box"></div><span class="cat-name">Business</span></label>
+          <label class="cat-chk"><input type="checkbox" class="cat-cb" value="politics"><div class="chk-box"></div><span class="cat-name">Politics</span></label>
+        </div>
+      </div>
+      <div class="fld"><label class="tgl-row"><input type="checkbox" id="post-featured"><div class="tgl-track"></div><span class="tgl-lbl">Mark as Featured</span></label></div>
+      <div class="fld">
+        <div class="media-head">Media Upload (Cloudinary)</div>
+        <div class="media-note">⚡ Upload image + video + audio all at once</div>
+        <div class="upload-slot">
+          <div class="slot-hdr"><span class="slot-icon">🖼</span><span class="slot-label">Image</span><span class="slot-status" id="img-status">No file</span></div>
+          <div class="upload-area"><input type="file" id="post-image" accept="image/*"><div class="upload-lbl">Click to upload · JPG PNG GIF WebP</div></div>
+          <div class="prev-wrap" id="img-preview"></div>
+          <div class="prog-bar" id="img-bar"><div class="prog-fill"></div><span class="prog-lbl">0%</span></div>
+        </div>
+        <div class="upload-slot">
+          <div class="slot-hdr"><span class="slot-icon">🎬</span><span class="slot-label">Video</span><span class="slot-status" id="vid-status">No file</span></div>
+          <div class="upload-area"><input type="file" id="post-video" accept="video/*"><div class="upload-lbl">Click to upload · MP4 MOV AVI WebM</div></div>
+          <div class="prev-wrap" id="vid-preview"></div>
+          <div class="prog-bar" id="vid-bar"><div class="prog-fill"></div><span class="prog-lbl">0%</span></div>
+        </div>
+        <div class="upload-slot">
+          <div class="slot-hdr"><span class="slot-icon">🎵</span><span class="slot-label">Audio / Music</span><span class="slot-status" id="mus-status">No file</span></div>
+          <div class="upload-area"><input type="file" id="post-music" accept="audio/*"><div class="upload-lbl">Click to upload · MP3 WAV AAC OGG</div></div>
+          <div class="prev-wrap" id="mus-preview"></div>
+          <div class="prog-bar" id="mus-bar"><div class="prog-fill"></div><span class="prog-lbl">0%</span></div>
+        </div>
+      </div>
+      <button id="publish-btn" onclick="publishPost()">PUBLISH POST</button>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="main-tabs">
+        <button class="main-tab active" onclick="switchTab(this,'panel-posts')">📝 Posts</button>
+        <button class="main-tab" onclick="switchTab(this,'panel-messages')">✉ Messages <span class="msg-badge" id="msg-badge"></span></button>
+      </div>
+      <div class="panel active" id="panel-posts">
+        <div class="panel-head">ALL POSTS</div>
+        <div class="filter-tabs">
+          <button class="f-tab active" onclick="ft(this,'all')">All</button>
+          <button class="f-tab" onclick="ft(this,'home')">Home</button>
+          <button class="f-tab" onclick="ft(this,'news')">News</button>
+          <button class="f-tab" onclick="ft(this,'music')">Music</button>
+          <button class="f-tab" onclick="ft(this,'entertainment')">Entertainment</button>
+          <button class="f-tab" onclick="ft(this,'sports')">Sports</button>
+          <button class="f-tab" onclick="ft(this,'business')">Business</button>
+          <button class="f-tab" onclick="ft(this,'politics')">Politics</button>
+        </div>
+        <div id="posts-list"></div>
+      </div>
+      <div class="panel" id="panel-messages">
+        <div class="panel-head">CONTACT MESSAGES</div>
+        <div class="msgs-layout">
+          <div class="msgs-inbox" id="messages-list"><div class="list-msg">Loading…</div></div>
+          <div class="msgs-detail" id="msg-detail"><div class="detail-empty">← Click a message to read it</div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function switchTab(btn, id) {
+  document.querySelectorAll(".main-tab").forEach(t=>t.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById(id).classList.add("active");
+  if (id==="panel-messages") loadMessages();
+}
+function ft(btn, cat) {
+  document.querySelectorAll(".f-tab").forEach(t=>t.classList.remove("active"));
+  btn.classList.add("active");
+  loadPosts(cat);
+}
+</script>
+</body>
+</html>

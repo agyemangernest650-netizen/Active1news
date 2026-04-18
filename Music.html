@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Active1 News</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style2.css">
+<script type="module" src="category.js"></script>
+</head>
+<body>
+<div class="topbar">BREAKING · LIVE · YOUR SOURCE FOR EVERYTHING</div>
+<header>
+  <div class="header-inner">
+    <a href="index.html" class="site-logo">ACtive1<span>.</span>News</a>
+    <nav class="desktop-nav">
+      <a href="index.html">Home</a>
+      <a href="News.html">News</a><a href="Music.html">Music</a>
+      <a href="Entertainment.html">Entertainment</a><a href="Sports.html">Sports</a>
+      <a href="Business.html">Business</a><a href="Politics.html">Politics</a>
+      <a href="index.html#contact">Contact</a>
+    </nav>
+    <div class="search-bar">
+      <span>🔍</span>
+      <input type="text" id="search-input" placeholder="Search…">
+    </div>
+    <button class="nav-toggle" id="nav-toggle">☰</button>
+  </div>
+  <nav class="mobile-nav" id="mobile-nav">
+    <a href="News.html">News</a><a href="Music.html">Music</a>
+    <a href="Entertainment.html">Entertainment</a><a href="Sports.html">Sports</a>
+    <a href="Business.html">Business</a><a href="Politics.html">Politics</a>
+  </nav>
+</header>
+
+<!-- CATEGORY HERO -->
+<div class="cat-hero-bar">
+  <h1 id="cat-title">Loading…</h1>
+  <p id="cat-desc"></p>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <span class="post-count" id="post-count">Loading…</span>
+  <div class="sort-btns">
+    <button class="sort-btn active" data-sort="newest"    onclick="changeSort('newest')">Newest</button>
+    <button class="sort-btn"        data-sort="popular"   onclick="changeSort('popular')">Most Viewed</button>
+    <button class="sort-btn"        data-sort="discussed" onclick="changeSort('discussed')">Most Commented</button>
+  </div>
+</div>
+
+<!-- POSTS GRID -->
+<div class="page">
+  <div class="posts-grid" id="posts-grid">
+    <div class="empty-state">Loading posts…</div>
+  </div>
+  <div class="load-more-wrap">
+    <button id="load-more" onclick="loadMore()">Load More</button>
+  </div>
+</div>
+
+<!-- POST MODAL -->
+<div id="post-modal">
+  <div class="modal-scroll-wrap">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">Active1<span>.</span>News</div>
+    <nav class="footer-nav">
+      <a href="News.html">News</a><a href="Music.html">Music</a>
+      <a href="Entertainment.html">Entertainment</a><a href="Sports.html">Sports</a>
+      <a href="Business.html">Business</a><a href="Politics.html">Politics</a>
+      <a href="home.html#contact">Contact</a>
+    </nav>
+    <div class="footer-copy">© 2026 ACTIVE1 News· All rights reserved</div>
+  </div>
+</footer>
+</body>
+</html>
