@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Daily Feed</title>
+<title>Actve1 News</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <script type="module">
@@ -13,7 +13,7 @@
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   // ── YOUR FIREBASE CONFIG ──────────────────────────────────────────────────
-  const firebaseConfig = {
+   const firebaseConfig = {
   apiKey: "AIzaSyDApdfrTSUndjEivoUqdLTp9-8MoPjFT7U",
   authDomain: "my-news-database.firebaseapp.com",
   projectId: "my-news-database",
@@ -27,7 +27,6 @@
   const db  = getFirestore(app);
   const CATS = ["news","music","entertainment","sports","business","politics"];
 
-  // ── HELPERS ───────────────────────────────────────────────────────────────
   function timeAgo(sec) {
     if (!sec) return "";
     const d = Math.floor(Date.now()/1000 - sec);
@@ -41,18 +40,23 @@
   let ALL_POSTS = [];
 
   async function fetchAll() {
-    const snap = await getDocs(collection(db,"posts"));
-    ALL_POSTS = [];
-    snap.forEach(d => ALL_POSTS.push({id:d.id,...d.data()}));
-    ALL_POSTS = ALL_POSTS.filter(p => p.status==="published");
-    ALL_POSTS.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    try {
+      const snap = await getDocs(collection(db,"posts"));
+      ALL_POSTS = [];
+      snap.forEach(d => ALL_POSTS.push({id:d.id,...d.data()}));
+      ALL_POSTS = ALL_POSTS.filter(p => p.status==="published");
+      ALL_POSTS.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    } catch(e) {
+      console.error("Firestore error:", e.message);
+      document.getElementById("firestore-error").style.display = "block";
+    }
   }
 
   // ── CARD ──────────────────────────────────────────────────────────────────
   function card(p, big=false) {
     const time=timeAgo(p.createdAt?.seconds), v=fmt(p.views||0), c=fmt(p.commentCount||0);
     let media="";
-    if (p.imageURL) media+=`<div class="cm"><img src="${p.imageURL}" alt="" loading="lazy"></div>`;
+    if (p.imageURL) media+=`<div class="cm"><img src="${p.imageURL}" alt="${p.title}" loading="lazy"></div>`;
     if (p.videoURL) media+=`<div class="cm cvid"><video src="${p.videoURL}" controls preload="none" playsinline></video></div>`;
     if (p.musicURL) media+=`<div class="cm caud"><span class="albl">🎵 Audio</span><audio src="${p.musicURL}" controls preload="none"></audio></div>`;
     if (!media)     media=`<div class="cm cblank"><span>${(p.categories?.[0]||"post").toUpperCase()}</span></div>`;
@@ -98,7 +102,7 @@
             <div class="hside-txt">
               ${p.tag?`<span class="hside-tag">${p.tag}</span>`:""}
               <div class="hside-title">${p.title}</div>
-              <div class="hside-meta">${p.author||"Admin"} · ${timeAgo(p.createdAt?.seconds)} <span>👁 ${fmt(p.views||0)}</span></div>
+              <div class="hside-meta">${p.author||"Admin"} · ${timeAgo(p.createdAt?.seconds)}</div>
             </div>
           </div>`).join("")}
       </div>`;
@@ -141,71 +145,127 @@
   };
   window.closeSearch=()=>{ document.getElementById("search-ov").style.display="none"; document.getElementById("search-input").value=""; };
 
-  // ── POST MODAL ────────────────────────────────────────────────────────────
-  window.openPost = async (id) => {
-    const modal=document.getElementById("post-modal");
-    const mbody=document.getElementById("modal-body");
-    mbody.innerHTML=`<div class="m-loading">Loading…</div>`;
-    modal.style.display="flex";
-    document.body.style.overflow="hidden";
-
-    const postRef=doc(db,"posts",id);
-    const viewKey="viewed_"+id;
-    if (!localStorage.getItem(viewKey)) {
-      await updateDoc(postRef,{views:increment(1)});
-      localStorage.setItem(viewKey,"1");
+  // ── SHARE ─────────────────────────────────────────────────────────────────
+  window.sharePost = async (id, title) => {
+    const url = `${location.origin}${location.pathname}?post=${id}`;
+    const shareData = { title: title, url: url };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(url);
+        showShareToast("Link copied to clipboard!");
+      }
+    } catch(e) {
+      try { await navigator.clipboard.writeText(url); showShareToast("Link copied!"); } catch(e2) {}
     }
-    const snap=await getDoc(postRef);
-    if (!snap.exists()) { mbody.innerHTML=`<div class="m-loading">Not found.</div>`; return; }
-    const p={id:snap.id,...snap.data()};
-
-    const cSnap=await getDocs(query(collection(db,"comments"),where("postId","==",id)));
-    const comments=[];
-    cSnap.forEach(d=>comments.push({id:d.id,...d.data()}));
-    comments.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-
-    let mMedia="";
-    if (p.imageURL) mMedia+=`<img class="m-img" src="${p.imageURL}" alt="${p.title}">`;
-    if (p.videoURL) mMedia+=`<video class="m-video" src="${p.videoURL}" controls preload="none"></video>`;
-    if (p.musicURL) mMedia+=`<div class="m-audio"><span>🎵 Audio Track</span><audio src="${p.musicURL}" controls></audio></div>`;
-
-    mbody.innerHTML=`
-      <div class="m-pills">
-        ${p.tag?`<span class="m-tag">${p.tag}</span>`:""}
-        ${(p.categories||[]).map(c=>`<span class="m-cat">${c}</span>`).join("")}
-      </div>
-      <h2 class="m-title">${p.title}</h2>
-      <div class="m-meta">By <strong>${p.author||"Admin"}</strong> · ${timeAgo(p.createdAt?.seconds)} · 👁 ${fmt(p.views||0)} · 💬 ${fmt(p.commentCount||0)}</div>
-      <div class="m-media">${mMedia}</div>
-      <div class="m-text">${(p.body||"").replace(/\n/g,"<br>")}</div>
-
-      <div class="m-comments">
-        <h3 class="mc-head">💬 Comments <span class="mc-badge">${comments.length}</span></h3>
-
-        <div class="mc-form">
-          <div class="mc-form-title">Leave a Comment</div>
-          <input class="mc-inp" id="cn-${id}" type="text" placeholder="Your name (optional)">
-          <textarea class="mc-ta" id="ct-${id}" placeholder="Write your comment here…" rows="4"></textarea>
-          <button class="mc-btn" id="mc-btn-${id}" onclick="submitComment('${id}')">Post Comment →</button>
-          <div class="mc-fb" id="mc-fb-${id}"></div>
-        </div>
-
-        <div id="mc-list-${id}">
-          ${comments.length ? comments.map(c=>`
-            <div class="mc-item">
-              <div class="mc-av">${(c.name||"?")[0].toUpperCase()}</div>
-              <div class="mc-content">
-                <div class="mc-name">${c.name||"Anonymous"}<span class="mc-time">${timeAgo(c.createdAt?.seconds)}</span></div>
-                <div class="mc-txt">${c.text}</div>
-              </div>
-            </div>`).join("") : `<div class="mc-empty">No comments yet. Be the first!</div>`}
-        </div>
-      </div>`;
   };
 
-  window.closeModal=()=>{
-    document.getElementById("post-modal").style.display="none";
-    document.body.style.overflow="";
+  function showShareToast(msg) {
+    const t = document.getElementById("share-toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 3000);
+  }
+
+  // ── POST MODAL ────────────────────────────────────────────────────────────
+  window.openPost = async (id) => {
+    const modal = document.getElementById("post-modal");
+    const mbody = document.getElementById("modal-body");
+    mbody.innerHTML = `<div class="m-loading"><div class="spinner"></div><span>Loading…</span></div>`;
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+
+    try {
+      const postRef = doc(db,"posts",id);
+      const viewKey = "viewed_"+id;
+      if (!localStorage.getItem(viewKey)) {
+        await updateDoc(postRef,{views:increment(1)});
+        localStorage.setItem(viewKey,"1");
+      }
+
+      const snap = await getDoc(postRef);
+      if (!snap.exists()) {
+        mbody.innerHTML=`<div class="m-loading">Post not found.</div>`;
+        return;
+      }
+      const p = {id:snap.id,...snap.data()};
+
+      const cSnap = await getDocs(query(collection(db,"comments"),where("postId","==",id)));
+      const comments = [];
+      cSnap.forEach(d=>comments.push({id:d.id,...d.data()}));
+      comments.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+      let mMedia="";
+      if (p.imageURL) mMedia+=`<img class="m-img" src="${p.imageURL}" alt="${p.title}">`;
+      if (p.videoURL) mMedia+=`<video class="m-video" src="${p.videoURL}" controls preload="none" playsinline></video>`;
+      if (p.musicURL) mMedia+=`<div class="m-audio"><span>🎵 Audio Track</span><audio src="${p.musicURL}" controls></audio></div>`;
+
+      const shareUrl = `${location.origin}${location.pathname}?post=${id}`;
+
+      mbody.innerHTML=`
+        <div class="m-pills">
+          ${p.tag?`<span class="m-tag">${p.tag}</span>`:""}
+          ${(p.categories||[]).map(c=>`<span class="m-cat">${c}</span>`).join("")}
+        </div>
+        <h2 class="m-title">${p.title}</h2>
+        <div class="m-meta">
+          By <strong>${p.author||"Admin"}</strong> · ${timeAgo(p.createdAt?.seconds)} · 👁 ${fmt(p.views||0)} · 💬 ${fmt(p.commentCount||0)}
+        </div>
+        <div class="m-media">${mMedia}</div>
+        <div class="m-text">${(p.body||"").replace(/\n/g,"<br>")}</div>
+
+        <div class="m-share-bar">
+          <span class="m-share-label">Share this story:</span>
+          <button class="share-btn whatsapp" onclick="sharePost('${id}','${p.title.replace(/'/g,"\\'")}')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.127 1.532 5.862L.054 23.947l6.235-1.635A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.007-1.373l-.36-.214-3.7.97.987-3.607-.235-.372A9.818 9.818 0 1112 21.818z"/></svg>
+            WhatsApp
+          </button>
+          <button class="share-btn facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('${shareUrl}'),'_blank')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            Facebook
+          </button>
+          <button class="share-btn twitter" onclick="window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent('${p.title}')+'&url='+encodeURIComponent('${shareUrl}'),'_blank')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            X (Twitter)
+          </button>
+          <button class="share-btn copy-link" onclick="sharePost('${id}','${p.title.replace(/'/g,"\\'")}')">
+            📋 Copy Link
+          </button>
+        </div>
+
+        <div class="m-comments">
+          <h3 class="mc-head">💬 Comments <span class="mc-badge">${comments.length}</span></h3>
+          <div class="mc-form">
+            <div class="mc-form-title">Leave a Comment</div>
+            <input class="mc-inp" id="cn-${id}" type="text" placeholder="Your name (optional)">
+            <textarea class="mc-ta" id="ct-${id}" placeholder="Write your comment here…" rows="4"></textarea>
+            <button class="mc-btn" id="mc-btn-${id}" onclick="submitComment('${id}')">Post Comment →</button>
+            <div class="mc-fb" id="mc-fb-${id}"></div>
+          </div>
+          <div id="mc-list-${id}">
+            ${comments.length ? comments.map(c=>`
+              <div class="mc-item">
+                <div class="mc-av">${(c.name||"?")[0].toUpperCase()}</div>
+                <div class="mc-content">
+                  <div class="mc-name">${c.name||"Anonymous"}<span class="mc-time">${timeAgo(c.createdAt?.seconds)}</span></div>
+                  <div class="mc-txt">${c.text}</div>
+                </div>
+              </div>`).join("") : `<div class="mc-empty">No comments yet. Be the first!</div>`}
+          </div>
+        </div>`;
+
+      // update URL so the post link is shareable
+      history.pushState({postId:id}, "", "?post="+id);
+
+    } catch(e) {
+      mbody.innerHTML = `<div class="m-loading" style="color:#c8102e">Error loading post.<br><small>${e.message}</small></div>`;
+    }
+  };
+
+  window.closeModal = () => {
+    document.getElementById("post-modal").style.display = "none";
+    document.body.style.overflow = "";
+    history.pushState({}, "", location.pathname);
   };
 
   window.submitComment = async (postId) => {
@@ -233,33 +293,31 @@
       list.prepend(div);
       btn.textContent="Post Comment →"; btn.disabled=false;
       setTimeout(()=>fb.textContent="",3000);
-    } catch(e) { fb.textContent="Error. Try again."; fb.style.color="#ff6b6b"; btn.disabled=false; btn.textContent="Post Comment →"; }
+    } catch(e) {
+      fb.textContent="Error. Try again."; fb.style.color="#ff6b6b";
+      btn.disabled=false; btn.textContent="Post Comment →";
+    }
   };
 
-  // ── CONTACT FORM — saves to Firestore ─────────────────────────────────────
+  // ── CONTACT FORM ──────────────────────────────────────────────────────────
   async function handleContact(e) {
     e.preventDefault();
-    const form=e.target;
-    const btn=form.querySelector(".contact-btn");
+    const form=e.target, btn=form.querySelector(".contact-btn");
     btn.textContent="Sending…"; btn.disabled=true;
     try {
-      await addDoc(collection(db,"messages"), {
+      await addDoc(collection(db,"messages"),{
         name:    document.getElementById("c-name").value.trim(),
         email:   document.getElementById("c-email").value.trim(),
-        topic:   document.getElementById("c-topic").value || "General Inquiry",
+        topic:   document.getElementById("c-topic").value||"General Inquiry",
         subject: document.getElementById("c-subject").value.trim(),
         message: document.getElementById("c-message").value.trim(),
-        read:    false,
-        createdAt: serverTimestamp()
+        read: false, createdAt: serverTimestamp()
       });
       document.getElementById("contact-success").style.display="block";
       form.reset();
       setTimeout(()=>document.getElementById("contact-success").style.display="none",5000);
-    } catch(err) {
-      alert("Failed to send. Please try again.");
-    } finally {
-      btn.textContent="Send Message"; btn.disabled=false;
-    }
+    } catch(err) { alert("Failed to send. Please try again."); }
+    finally { btn.textContent="Send Message"; btn.disabled=false; }
   }
 
   // ── INIT ──────────────────────────────────────────────────────────────────
@@ -267,10 +325,33 @@
     await fetchAll();
     renderHero();
     renderCategories();
+
+    // check if URL has ?post=ID (from a shared link)
+    const params = new URLSearchParams(location.search);
+    const sharedPostId = params.get("post");
+    if (sharedPostId) openPost(sharedPostId);
+
+    // search
     document.getElementById("search-input").addEventListener("input", doSearch);
     document.getElementById("search-input").addEventListener("keydown", e=>{ if(e.key==="Escape") closeSearch(); });
-    document.getElementById("nav-toggle").addEventListener("click", ()=>document.getElementById("mobile-nav").classList.toggle("open"));
-    document.getElementById("post-modal").addEventListener("click", e=>{ if(e.target===document.getElementById("post-modal")) closeModal(); });
+
+    // nav toggle — fixed with onclick instead of addEventListener
+    document.getElementById("nav-toggle").onclick = function() {
+      const nav = document.getElementById("mobile-nav");
+      nav.style.display = nav.style.display === "block" ? "none" : "block";
+    };
+
+    // close modal on backdrop click
+    document.getElementById("post-modal").addEventListener("click", e=>{
+      if (e.target === document.getElementById("post-modal")) closeModal();
+    });
+
+    // close search on backdrop click
+    document.getElementById("search-ov").addEventListener("click", e=>{
+      if (e.target === document.getElementById("search-ov")) closeSearch();
+    });
+
+    // contact form
     document.getElementById("contact-form").addEventListener("submit", handleContact);
   });
 </script>
@@ -283,6 +364,9 @@ html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--ink);font-family:var(--fb);font-size:15px;line-height:1.6}
 a{color:inherit;text-decoration:none}img{display:block;max-width:100%}
 
+/* ERROR BANNER */
+#firestore-error{display:none;background:#fff3cd;border:1px solid #ffc107;color:#856404;font-family:var(--fm);font-size:12px;padding:12px 24px;text-align:center;letter-spacing:1px}
+
 .topbar{background:var(--acc);color:#fff;text-align:center;font-family:var(--fm);font-size:11px;letter-spacing:2px;padding:6px}
 header{background:var(--sur);border-bottom:3px solid var(--ink);position:sticky;top:0;z-index:200}
 .hdr-i{max-width:1280px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
@@ -294,18 +378,17 @@ header{background:var(--sur);border-bottom:3px solid var(--ink);position:sticky;
 .sbar{display:flex;align-items:center;background:var(--sur2);border:1px solid var(--bdr);padding:6px 12px;gap:8px;flex:1;max-width:260px}
 .sbar input{background:none;border:none;outline:none;font-family:var(--fb);font-size:13px;color:var(--ink);width:100%}
 .sbar input::placeholder{color:var(--mu)}
-.ntgl{display:none;background:none;border:1px solid var(--bdr);padding:8px 12px;cursor:pointer;font-size:18px;color:var(--ink)}
-.mnav{display:none;background:var(--sur);border-top:1px solid var(--bdr);padding:12px 24px 20px}
-.mnav.open{display:block}
-.mnav a{display:block;font-family:var(--fm);font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:10px 0;border-bottom:1px solid var(--bdr);color:var(--mu)}
-@media(max-width:900px){.desk-nav{display:none}.ntgl{display:block}}
-@media(max-width:540px){.sbar{display:none}}
+.ntgl{display:none;background:none;border:1px solid var(--bdr);padding:8px 12px;cursor:pointer;font-size:20px;color:var(--ink);line-height:1}
+#mobile-nav{display:none;background:var(--sur);border-top:1px solid var(--bdr);padding:12px 24px 20px}
+#mobile-nav a{display:block;font-family:var(--fm);font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:10px 0;border-bottom:1px solid var(--bdr);color:var(--mu)}
+@media(max-width:900px){.desk-nav{display:none}.ntgl{display:block}.sbar{max-width:180px}}
+@media(max-width:480px){.sbar{display:none}}
 
 /* SEARCH OVERLAY */
 #search-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:flex-start;justify-content:center;padding-top:80px}
 .s-box{background:var(--sur);width:100%;max-width:640px;max-height:70vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 .s-close{position:absolute;top:20px;right:24px;background:none;border:none;font-size:28px;color:#fff;cursor:pointer}
-.s-item{display:flex;gap:14px;padding:14px 18px;border-bottom:1px solid var(--bdr);cursor:pointer;align-items:center}
+.s-item{display:flex;gap:14px;padding:14px 18px;border-bottom:1px solid var(--bdr);cursor:pointer;align-items:center;transition:background .15s}
 .s-item:hover{background:var(--sur2)}
 .s-item img{width:64px;height:48px;object-fit:cover;flex-shrink:0}
 .s-ph{width:64px;height:48px;background:var(--sur2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
@@ -313,7 +396,6 @@ header{background:var(--sur);border-bottom:3px solid var(--ink);position:sticky;
 .s-meta{font-family:var(--fm);font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:1px}
 .s-empty{padding:32px;text-align:center;font-family:var(--fm);font-size:12px;color:var(--mu)}
 
-/* PAGE */
 .page{max-width:1280px;margin:0 auto;padding:0 24px}
 
 /* HERO */
@@ -332,10 +414,9 @@ header{background:var(--sur);border-bottom:3px solid var(--ink);position:sticky;
 .hside-item img,.hside-ph{width:68px;height:52px;object-fit:cover;flex-shrink:0;background:var(--sur2);display:flex;align-items:center;justify-content:center;font-size:18px}
 .hside-tag{font-family:var(--fm);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--acc);display:block;margin-bottom:3px}
 .hside-title{font-family:var(--fh);font-size:13px;font-weight:700;line-height:1.3;color:var(--ink)}
-.hside-meta{font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:3px;display:flex;gap:8px}
+.hside-meta{font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:3px}
 @media(max-width:900px){#hero{grid-template-columns:1fr;min-height:auto}.hero-side{border-left:1px solid var(--bdr);border-top:none}}
 
-/* SECTIONS */
 .sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:10px;border-bottom:3px solid var(--ink)}
 .sec-title{font-family:var(--fh);font-size:26px;font-weight:900;letter-spacing:-.5px;display:flex;align-items:center;gap:10px}
 .sec-cnt{font-family:var(--fm);font-size:11px;color:var(--mu);background:var(--sur2);border:1px solid var(--bdr);padding:2px 8px;border-radius:20px}
@@ -375,9 +456,14 @@ hr.div{border:none;border-top:1px solid var(--bdr);margin:48px 0}
 #post-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;justify-content:center;align-items:flex-start;overflow-y:auto}
 .m-wrap{width:100%;min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px}
 .m-box{background:var(--sur);width:100%;max-width:780px;position:relative}
-.m-close{position:fixed;top:16px;right:16px;background:rgba(0,0,0,.7);border:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;z-index:10;color:#fff;border-radius:50%}
+.m-close{position:fixed;top:16px;right:16px;background:rgba(0,0,0,.7);border:none;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:10;color:#fff;border-radius:50%}
 .m-close:hover{background:var(--acc)}
-.m-loading{padding:48px;text-align:center;font-family:var(--fm);font-size:12px;color:var(--mu)}
+
+/* LOADING SPINNER */
+.m-loading{padding:60px 24px;text-align:center;font-family:var(--fm);font-size:12px;color:var(--mu);display:flex;flex-direction:column;align-items:center;gap:16px}
+.spinner{width:36px;height:36px;border:3px solid var(--bdr);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
 .m-pills{padding:24px 24px 0;display:flex;gap:6px;flex-wrap:wrap}
 .m-tag{background:var(--acc);color:#fff;font-family:var(--fm);font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:3px 8px}
 .m-cat{background:var(--sur2);border:1px solid var(--bdr);font-family:var(--fm);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;color:var(--mu)}
@@ -391,6 +477,21 @@ hr.div{border:none;border-top:1px solid var(--bdr);margin:48px 0}
 .m-audio audio{flex:1}
 .m-text{padding:24px;font-size:15px;line-height:1.85;color:#2a2a2a;border-bottom:2px solid var(--bdr)}
 
+/* SHARE BAR */
+.m-share-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:16px 24px;background:var(--sur2);border-bottom:1px solid var(--bdr)}
+.m-share-label{font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--mu);margin-right:4px}
+.share-btn{display:flex;align-items:center;gap:6px;border:none;padding:8px 14px;font-family:var(--fm);font-size:11px;letter-spacing:1px;cursor:pointer;transition:opacity .2s;border-radius:2px;color:#fff}
+.share-btn:hover{opacity:.85}
+.share-btn svg{width:16px;height:16px;flex-shrink:0}
+.share-btn.whatsapp{background:#25D366}
+.share-btn.facebook{background:#1877F2}
+.share-btn.twitter{background:#000}
+.share-btn.copy-link{background:var(--ink)}
+
+/* SHARE TOAST */
+#share-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;font-family:var(--fm);font-size:12px;padding:10px 24px;border-radius:24px;opacity:0;transition:all .3s;z-index:999;pointer-events:none;white-space:nowrap}
+#share-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
 /* COMMENTS */
 .m-comments{padding:28px 24px 40px}
 .mc-head{font-family:var(--fh);font-size:22px;font-weight:700;margin-bottom:24px;display:flex;align-items:center;gap:10px}
@@ -400,7 +501,7 @@ hr.div{border:none;border-top:1px solid var(--bdr);margin:48px 0}
 .mc-inp,.mc-ta{width:100%;background:var(--sur);border:1px solid var(--bdr);padding:11px 14px;font-family:var(--fb);font-size:14px;color:var(--ink);outline:none;transition:border-color .2s;display:block;margin-bottom:10px}
 .mc-inp:focus,.mc-ta:focus{border-color:var(--acc)}
 .mc-ta{resize:vertical;min-height:100px}
-.mc-btn{background:var(--acc);color:#fff;border:none;font-family:var(--fm);font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:12px 24px;cursor:pointer;transition:opacity .2s}
+.mc-btn{background:var(--acc);color:#fff;border:none;font-family:var(--fm);font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:12px 24px;cursor:pointer}
 .mc-btn:hover{opacity:.85}.mc-btn:disabled{opacity:.5;cursor:not-allowed}
 .mc-fb{font-family:var(--fm);font-size:11px;margin-top:10px;min-height:16px;letter-spacing:1px}
 .mc-item{display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--bdr)}
@@ -429,7 +530,6 @@ hr.div{border:none;border-top:1px solid var(--bdr);margin:48px 0}
 .contact-btn:hover{opacity:.85}.contact-btn:disabled{opacity:.5}
 #contact-success{display:none;background:rgba(50,200,100,.15);border:1px solid rgba(50,200,100,.4);color:#5cff8c;font-family:var(--fm);font-size:12px;padding:14px 18px;letter-spacing:1px;margin-top:8px}
 
-/* FOOTER */
 footer{background:var(--ink);border-top:3px solid var(--acc);padding:40px 24px 24px;color:rgba(255,255,255,.4)}
 .fi{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center}
 .flogo{font-family:var(--fh);font-size:24px;font-weight:900;color:#fff}.flogo span{color:var(--acc)}
@@ -441,65 +541,65 @@ footer{background:var(--ink);border-top:3px solid var(--acc);padding:40px 24px 2
 </head>
 <body>
 
+<div id="firestore-error">⚠ Could not load posts. Please update your Firestore rules to allow public reads.</div>
 <div class="topbar">BREAKING · LIVE · YOUR SOURCE FOR EVERYTHING</div>
 
 <header>
   <div class="hdr-i">
     <a href="index.html" class="logo">Active1<span>.</span>News</a>
     <nav class="desk-nav">
-      <a href="#news">News</a><a href="#music">Music</a>
-      <a href="#entertainment">Entertainment</a><a href="#sports">Sports</a>
-      <a href="#business">Business</a><a href="#politics">Politics</a>
-      <a href="#contact">Contact</a>
+      <a href="News.html">News</a><a href="Music.html">Music</a>
+      <a href="Entertainment.html">Entertainment</a><a href="Sports.html">Sports</a>
+      <a href="Business.html">Business</a><a href="Politics.html">Politics</a>
+      <a href="index.html#contact">Contact</a>
     </nav>
     <div class="sbar"><span>🔍</span><input type="text" id="search-input" placeholder="Search posts…"></div>
     <button class="ntgl" id="nav-toggle">☰</button>
   </div>
-  <nav class="mnav" id="mobile-nav">
-    <a href="#news">News</a><a href="#music">Music</a>
-    <a href="#entertainment">Entertainment</a><a href="#sports">Sports</a>
-    <a href="#business">Business</a><a href="#politics">Politics</a><a href="#contact">Contact</a>
+  <nav id="mobile-nav">
+    <a href="index.html">Home</a>
+    <a href="News.html">News</a><a href="Music.html">Music</a>
+    <a href="Entertainment.html">Entertainment</a><a href="Sports.html">Sports</a>
+    <a href="Business.html">Business</a><a href="Politics.html">Politics</a>
   </nav>
 </header>
 
-<!-- SEARCH OVERLAY -->
 <div id="search-ov">
   <button class="s-close" onclick="closeSearch()">✕</button>
   <div class="s-box" id="search-res"></div>
 </div>
 
-<!-- HERO -->
 <div id="hero"></div>
 
 <div class="page">
   <section class="cat-sec" id="news">
     <div class="sec-hdr"><div class="sec-title">News <span class="sec-cnt" id="cnt-news">…</span></div><a href="News.html" class="sec-lnk">All News →</a></div>
-    <div class="cat-wrap" id="grid-news"><div class="empty-cat" style="height:120px"></div></div>
+    <div class="cat-wrap" id="grid-news"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="music">
     <div class="sec-hdr"><div class="sec-title">Music <span class="sec-cnt" id="cnt-music">…</span></div><a href="Music.html" class="sec-lnk">All Music →</a></div>
-    <div class="cat-wrap" id="grid-music"><div class="empty-cat" style="height:120px"></div></div>
+    <div class="cat-wrap" id="grid-music"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="entertainment">
-    <div class="sec-hdr"><div class="sec-title">Entertainment <span class="sec-cnt" id="cnt-entertainment">…</span></div><a href="Entertainment.html" class="sec-lnk">All Entertainment →</a></div>
-    <div class="cat-wrap" id="grid-entertainment"><div class="empty-cat" style="height:120px"></div></div>
+    <div class="sec-hdr"><div class="sec-title">Entertainment <span class="sec-cnt" id="cnt-entertainment">…</span></div><a href="Entertainment.html" class="sec-lnk">All →</a></div>
+    <div class="cat-wrap" id="grid-entertainment"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="sports">
     <div class="sec-hdr"><div class="sec-title">Sports <span class="sec-cnt" id="cnt-sports">…</span></div><a href="Sports.html" class="sec-lnk">All Sports →</a></div>
-    <div class="cat-wrap" id="grid-sports"><div class="empty-cat" style="height:120px"></div></div>
+    <div class="cat-wrap" id="grid-sports"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="business">
     <div class="sec-hdr"><div class="sec-title">Business <span class="sec-cnt" id="cnt-business">…</span></div><a href="Business.html" class="sec-lnk">All Business →</a></div>
-    <div class="cat-wrap" id="grid-business"><div class="empty-cat" style="height:120px"></div></div>
+    <div class="cat-wrap" id="grid-business"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="politics">
     <div class="sec-hdr"><div class="sec-title">Politics <span class="sec-cnt" id="cnt-politics">…</span></div><a href="Politics.html" class="sec-lnk">All Politics →</a></div>
-    <div class="cat-wrap" id="grid-politics"><div class="empty-cat" style="height:120px"></div></div>
+    <div class="cat-wrap" id="grid-politics"><div class="empty-cat">Loading…</div></div>
   </section>
 </div>
 
@@ -513,12 +613,14 @@ footer{background:var(--ink);border-top:3px solid var(--acc);padding:40px 24px 2
   </div>
 </div>
 
+<div id="share-toast"></div>
+
 <!-- CONTACT -->
 <section class="contact-sec" id="contact">
   <div class="ci">
     <div class="c-lbl">Get In Touch</div>
     <h2 class="c-h2">Contact Us</h2>
-    <p class="c-sub">Have a story tip, feedback, or just want to say hello? We'd love to hear from you.</p>
+    <p class="c-sub">Have a story tip, feedback, or just want to say hello?</p>
     <form class="c-form" id="contact-form">
       <div class="c-row">
         <input class="c-inp" id="c-name"  type="text"  placeholder="Your Name"     required>
@@ -532,7 +634,6 @@ footer{background:var(--ink);border-top:3px solid var(--acc);padding:40px 24px 2
         <option>Politics</option><option>Advertising</option><option>Other</option>
       </select>
       <input class="c-inp" id="c-subject" type="text" placeholder="Subject">
-      <input class="c-inp" id="c-subject" type="number" placeholder="Phone number">
       <textarea class="c-ta" id="c-message" placeholder="Your message…" required></textarea>
       <button class="contact-btn" type="submit">Send Message</button>
     </form>

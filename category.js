@@ -224,7 +224,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
   // ── INIT ──────────────────────────────────────────────────────────────────
   window.addEventListener("DOMContentLoaded", async ()=>{
     // set page titles and colors
-    document.title = META.label+" — The Daily Feed";
+    document.title = META.label+" — Active1 News";
     document.getElementById("cat-title").textContent = META.emoji+" "+META.label;
     document.getElementById("cat-desc").textContent = "The latest "+META.label+" stories, updates and more.";
     document.querySelector(".cat-hero-bar").style.background = META.color;

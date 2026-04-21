@@ -1,0 +1,50 @@
+# netlify.toml â€” place this in your project root folder
+
+[build]
+  publish = "."
+
+# Redirect all category pages cleanly
+[[redirects]]
+  from = "/news"
+  to   = "/News.html"
+  status = 200
+
+[[redirects]]
+  from = "/music"
+  to   = "/Music.html"
+  status = 200
+
+[[redirects]]
+  from = "/entertainment"
+  to   = "/Entertainment.html"
+  status = 200
+
+[[redirects]]
+  from = "/sports"
+  to   = "/Sports.html"
+  status = 200
+
+[[redirects]]
+  from = "/business"
+  to   = "/Business.html"
+  status = 200
+
+[[redirects]]
+  from = "/politics"
+  to   = "/Politics.html"
+  status = 200
+
+# Security headers for all pages
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
+
+# Extra security headers specifically for admin page
+[[headers]]
+  for = "/admin.html"
+  [headers.values]
+    X-Robots-Tag           = "noindex, nofollow"
+    Cache-Control          = "no-store, no-cache, must-revalidate"
