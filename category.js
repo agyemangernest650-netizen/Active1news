@@ -139,7 +139,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     document.body.style.overflow="hidden";
 
     const postRef=doc(db,"posts",id);
+    const viewKey = "viewed_"+id;
+    if (!localStorage.getItem(viewKey)) {
     await updateDoc(postRef,{views:increment(1)});
+    localStorage.setItem(viewKey,"1");
+    }
     const snap=await getDoc(postRef);
     if (!snap.exists()){mbody.innerHTML=`<div class="modal-loading">Post not found.</div>`;return;}
     const p={id:snap.id,...snap.data()};

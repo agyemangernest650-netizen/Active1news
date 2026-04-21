@@ -178,10 +178,10 @@
     try {
       const postRef = doc(db,"posts",id);
       const viewKey = "viewed_"+id;
-      if (!localStorage.getItem(viewKey)) {
+      if (!localStorage.getItem(viewKey)) try {
         await updateDoc(postRef,{views:increment(1)});
         localStorage.setItem(viewKey,"1");
-      }
+      } catch(e) {console.log("View count skipped")}
 
       const snap = await getDoc(postRef);
       if (!snap.exists()) {
