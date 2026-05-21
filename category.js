@@ -17,6 +17,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
 
+
   // ── AUTO-DETECT CATEGORY FROM FILENAME ──────────────────────────────────
   const filename = location.pathname.split("/").pop().replace(".html","").toLowerCase();
   const CAT_META = {
@@ -95,9 +96,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 
   function renderGrid() {
     const grid=document.getElementById("posts-grid");
-    const count=document.getElementById("post-count");
     const loadBtn=document.getElementById("load-more");
-    count.textContent=FILTERED.length+" posts";
 
     const slice=FILTERED.slice(0,(PAGE+1)*PER_PAGE);
     if (PAGE===0) grid.innerHTML="";
