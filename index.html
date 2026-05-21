@@ -358,7 +358,7 @@
 
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#f5f0e8;--ink:#0f0f0f;--mu:#6b6560;--bdr:#d8d0c4;--acc:#c8102e;--acc2:#1a3a5c;--sur:#fff;--sur2:#ede8df;
+:root{--bg:rgba(101, 162, 208, 0.477);--ink:#0f0f0f;--mu:#6b6560;--bdr:#d8d0c4;--acc:#c8102e;--acc2:#1a3a5c;--sur:#fff;--sur2:#ede8df;
   --fh:'Playfair Display',Georgia,serif;--fb:'DM Sans',sans-serif;--fm:'DM Mono',monospace}
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--ink);font-family:var(--fb);font-size:15px;line-height:1.6}
@@ -367,11 +367,11 @@ a{color:inherit;text-decoration:none}img{display:block;max-width:100%}
 /* ERROR BANNER */
 #firestore-error{display:none;background:#fff3cd;border:1px solid #ffc107;color:#856404;font-family:var(--fm);font-size:12px;padding:12px 24px;text-align:center;letter-spacing:1px}
 
-.topbar{background:var(--acc);color:#fff;text-align:center;font-family:var(--fm);font-size:11px;letter-spacing:2px;padding:6px}
+.topbar{background:var(--acc);color:white;text-align:center;font-family:var(--fm);font-size:11px;letter-spacing:2px;padding:6px}
 header{background:var(--sur);border-bottom:3px solid var(--ink);position:sticky;top:0;z-index:200}
 .hdr-i{max-width:1280px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
 .logo{font-family:var(--fh);font-size:28px;font-weight:900;letter-spacing:-1px;white-space:nowrap}
-.logo span{color:var(--acc)}
+.logo span{color:white;}
 .desk-nav{display:flex;gap:2px;flex-shrink:0}
 .desk-nav a{font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px;color:var(--mu);transition:color .15s;border-bottom:2px solid transparent}
 .desk-nav a:hover{color:var(--acc);border-bottom-color:var(--acc)}
@@ -542,11 +542,11 @@ footer{background:var(--ink);border-top:3px solid var(--acc);padding:40px 24px 2
 <body>
 
 <div id="firestore-error">⚠ Could not load posts. Please update your Firestore rules to allow public reads.</div>
-<div class="topbar">BREAKING · LIVE · YOUR SOURCE FOR EVERYTHING</div>
+<div class="topbar"><a class="logo">Active1<span>.</span>News</a>  YOUR SOURCE FOR EVERYTHING</div>
 
 <header>
   <div class="hdr-i">
-    <a href="index.html" class="logo">Active1<span>.</span>News</a>
+    <div><img src="Active.jpeg" width="110" height="60"></div>
     <nav class="desk-nav">
       <a href="News.html">News</a><a href="Music.html">Music</a>
       <a href="Entertainment.html">Entertainment</a><a href="Sports.html">Sports</a>
@@ -573,32 +573,32 @@ footer{background:var(--ink);border-top:3px solid var(--acc);padding:40px 24px 2
 
 <div class="page">
   <section class="cat-sec" id="news">
-    <div class="sec-hdr"><div class="sec-title">News <span class="sec-cnt" id="cnt-news">…</span></div><a href="News.html" class="sec-lnk">All News →</a></div>
+    <div class="sec-hdr"><div class="sec-title">News 📰</div><a href="News.html" class="sec-lnk">All News →</a></div>
     <div class="cat-wrap" id="grid-news"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="music">
-    <div class="sec-hdr"><div class="sec-title">Music <span class="sec-cnt" id="cnt-music">…</span></div><a href="Music.html" class="sec-lnk">All Music →</a></div>
+    <div class="sec-hdr"><div class="sec-title">Music 🎵</div><a href="Music.html" class="sec-lnk">All Music →</a></div>
     <div class="cat-wrap" id="grid-music"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="entertainment">
-    <div class="sec-hdr"><div class="sec-title">Entertainment <span class="sec-cnt" id="cnt-entertainment">…</span></div><a href="Entertainment.html" class="sec-lnk">All →</a></div>
+    <div class="sec-hdr"><div class="sec-title">Entertainment 🎬</div><a href="Entertainment.html" class="sec-lnk">All →</a></div>
     <div class="cat-wrap" id="grid-entertainment"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="sports">
-    <div class="sec-hdr"><div class="sec-title">Sports <span class="sec-cnt" id="cnt-sports">…</span></div><a href="Sports.html" class="sec-lnk">All Sports →</a></div>
+    <div class="sec-hdr"><div class="sec-title">Sports ⚽</div><a href="Sports.html" class="sec-lnk">All Sports →</a></div>
     <div class="cat-wrap" id="grid-sports"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="business">
-    <div class="sec-hdr"><div class="sec-title">Business <span class="sec-cnt" id="cnt-business">…</span></div><a href="Business.html" class="sec-lnk">All Business →</a></div>
+    <div class="sec-hdr"><div class="sec-title">Business 💼</div><a href="Business.html" class="sec-lnk">All Business →</a></div>
     <div class="cat-wrap" id="grid-business"><div class="empty-cat">Loading…</div></div>
   </section><hr class="div">
 
   <section class="cat-sec" id="politics">
-    <div class="sec-hdr"><div class="sec-title">Politics <span class="sec-cnt" id="cnt-politics">…</span></div><a href="Politics.html" class="sec-lnk">All Politics →</a></div>
+    <div class="sec-hdr"><div class="sec-title">Politics 🏛</div><a href="Politics.html" class="sec-lnk">All Politics →</a></div>
     <div class="cat-wrap" id="grid-politics"><div class="empty-cat">Loading…</div></div>
   </section>
 </div>
@@ -643,7 +643,7 @@ footer{background:var(--ink);border-top:3px solid var(--acc);padding:40px 24px 2
 
 <footer>
   <div class="fi">
-    <div class="flogo">Active1<span>.</span>News</div>
+    <div> <img src="Active.jpeg" width="150" height="70"></div>
     <nav class="fnav">
       <a href="News.html">News</a><a href="Music.html">Music</a>
       <a href="Entertainment.html">Entertainment</a><a href="Sports.html">Sports</a>
