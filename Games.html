@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Games</title>
     <link rel="stylesheet" href="style2.css">
-    <script type="module" src="category.js"></script>
+    <script type="module">
+          document.getElementById("nav-toggle").addEventListener("click",()=>document.getElementById("mobile-nav").classList.toggle("open"));
+    </script>
 </head>
 <body>
     <div class="topbar"><a class="site-logo">Active1<span>.</span>News</a> YOUR SOURCE FOR EVERYTHING</div>
@@ -34,13 +36,13 @@
 
 <!-- CATEGORY HERO -->
 <div class="cat-hero-bar">
-  <h1 id="cat-title">Loading…</h1>
+  <h1 id="cat-title"> ⚽ GAMES</h1>
 </div>
-<div>
-    <a href="Snake.html">Play Snake</a>
-    <iframe src="Car.html" width="600" height="620" frameborder="0"></iframe>
-    <iframe src="shooter.html" width="600" height="620" frameborder="0"></iframe>
-    <iframe src="Puzzle.html" width="1000" height="760" frameborder="0"></iframe>
+<div class="container">
+    <div><a href="Snake.html"> <img src="Snake.jpeg" width="620" height="400"></a></div><br>
+    <div><a href="Car.html"><img src="Car.jpeg" width="620" height="400"></a></div><br>
+    <div><a href="shooter.html"><img src="turbo.jpeg" width="620" height="400"></a></div><br>
+    <div><a href="Puzzle.html"><img src="puzzle.jpeg" width="620" height="400"></a></div><br>
 </div>
 
 <footer>

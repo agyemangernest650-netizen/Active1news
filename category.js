@@ -27,7 +27,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     sports:        { label:"Sports",        emoji:"⚽", color:"#059669" },
     business:      { label:"Business",      emoji:"💼", color:"#1a3a5c" },
     politics:      { label:"Politics",      emoji:"🏛", color:"#b45309" },
-    games:         {label:"Games",          emoji:"⚽",       color:"#4827c9"},
   };
   const CAT = CAT_META[filename] ? filename : "news";
   const META = CAT_META[CAT];
