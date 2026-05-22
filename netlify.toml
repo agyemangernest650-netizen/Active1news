@@ -34,6 +34,32 @@
   to   = "/Politics.html"
   status = 200
 
+  [[redirects]]
+  from = "/Games"
+  to   = "/Games.html"
+  status = 200
+
+  [[redirects]]
+  from = "/Snake"
+  to   = "/Snake.html"
+  status = 200
+
+  [[redirects]]
+  from = "/Car"
+  to   = "/Car.html"
+  status = 200
+
+  [[redirects]]
+  from = "/shooter"
+  to   = "/shooter.html"
+  status = 200
+
+[[redirects]]
+  from = "/Puzzle"
+  to   = "/Puzzle.html"
+  status = 200
+
+
 # Security headers for all pages
 [[headers]]
   for = "/*"
