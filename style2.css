@@ -117,3 +117,10 @@ footer{background:var(--ink);border-top:3px solid var(--accent);padding:40px 24p
 .footer-nav a{font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.35);transition:color .15s}
 .footer-nav a:hover{color:var(--accent)}
 .footer-copy{font-family:var(--fm);font-size:10px;letter-spacing:1px}
+
+.m-download-bar{display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--bdr);margin-top:4px}
+.dl-main-btn{background:var(--acc);color:#fff;border:none;font-family:var(--fm);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:11px 22px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s}
+.dl-main-btn:hover{opacity:.85}
+.dl-main-btn.loading{opacity:.6;pointer-events:none}
+.dl-main-btn.done{background:#16a34a}
+.dl-file-info{font-family:var(--fm);font-size:11px;color:var(--mu);letter-spacing:1px}

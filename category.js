@@ -186,6 +186,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
           </button>
         </div>
 
+         ${(p.downloadURL) ? `
+        <div class="m-download-bar">
+          <button class="dl-main-btn" onclick="handleDownload('${p.downloadURL}','${p.downloadName||p.title}')">
+            ⬇ Download
+          </button>
+          <span class="dl-file-info">${p.downloadName||"Download file"}</span>
+        </div>` : ""}
+
       <div class="comments-section">
         <h3 class="comments-heading">💬 Comments <span class="comments-badge">${comments.length}</span></h3>
 
@@ -279,3 +287,30 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     document.getElementById("nav-toggle").addEventListener("click",()=>document.getElementById("mobile-nav").classList.toggle("open"));
     document.getElementById("post-modal").addEventListener("click",e=>{if(e.target===document.getElementById("post-modal"))closeModal();});
   });
+
+   window.handleDownload = async (url, filename) => {
+  const btn = event.currentTarget;
+  const orig = btn.innerHTML;
+  btn.classList.add('loading');
+  btn.innerHTML = '⏳ Downloading…';
+  try {
+    const res = await fetch(url.includes('cloudinary.com')
+      ? url.replace('/upload/','/upload/fl_attachment/') : url);
+    if (!res.ok) throw new Error();
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    btn.classList.remove('loading');
+    btn.classList.add('done');
+    btn.innerHTML = '✓ Downloaded';
+    showShareToast('✅ Download started — check your Files app');
+    setTimeout(() => { btn.classList.remove('done'); btn.innerHTML = orig; }, 4000);
+  } catch {
+    btn.classList.remove('loading');
+    btn.innerHTML = orig;
+    showShareToast('❌ Download failed — check the file URL');
+  }
+};
