@@ -151,6 +151,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     const comments=[];
     cSnap.forEach(d=>comments.push({id:d.id,...d.data()}));
     comments.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    const shareUrl = `${location.origin}${location.pathname}?post=${id}`;
 
     let mediaHtml="";
     if (p.imageURL) mediaHtml+=`<img class="modal-img" src="${p.imageURL}" alt="${p.title}">`;
@@ -288,20 +289,23 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     document.getElementById("post-modal").addEventListener("click",e=>{if(e.target===document.getElementById("post-modal"))closeModal();});
   });
 
-   window.handleDownload = async (url, filename) => {
-  const btn = event.currentTarget;
+window.handleDownload = async (url, filename) => {
+  const btn = document.querySelector('.dl-main-btn');
   const orig = btn.innerHTML;
   btn.classList.add('loading');
   btn.innerHTML = '⏳ Downloading…';
   try {
-    const res = await fetch(url.includes('cloudinary.com')
-      ? url.replace('/upload/','/upload/fl_attachment/') : url);
+    const fetchUrl = url.includes('cloudinary.com')
+      ? url.replace('/upload/', '/upload/fl_attachment/') : url;
+    const res = await fetch(fetchUrl);
     if (!res.ok) throw new Error();
     const blob = await res.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
     btn.classList.remove('loading');
     btn.classList.add('done');
